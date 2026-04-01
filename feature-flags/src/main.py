@@ -150,9 +150,11 @@ def create_app() -> FastAPI:
     app.add_middleware(SlowAPIMiddleware)
 
     # ── CORS ─────────────────────────────────────────────────────────────────
+    # Em dev (DEBUG=true): aceita qualquer origem.
+    # Em prod: usa CORS_ORIGINS (env var, vírgula-separado). Vazio = bloqueado.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.debug else [],
+        allow_origins=["*"] if settings.debug else settings.cors_origins,
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
     )

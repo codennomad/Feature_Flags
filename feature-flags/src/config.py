@@ -60,6 +60,12 @@ class Settings(BaseSettings):
         default=["localhost", "127.0.0.1"],
         description="Hosts permitidos pelo TrustedHostMiddleware (ALLOWED_HOSTS).",
     )
+    # Defina CORS_ORIGINS como lista separada por vírgula, ex:
+    # CORS_ORIGINS=https://app.meudominio.com,https://admin.meudominio.com
+    cors_origins: list[str] = Field(
+        default=[],
+        description="Origens permitidas pelo CORS (CORS_ORIGINS). Vazio = sem origens em prod.",
+    )
 
     # ── SQLAlchemy pool ───────────────────────────────────────────────────────
     db_pool_size: int = Field(default=20)

@@ -77,30 +77,50 @@ async def start_listener() -> None:
     log.info("Listener pub/sub iniciado no canal: %s", settings.redis_pubsub_channel)
 
 
+# Delays de backoff para reconexão ao Redis (segundos)
+_RECONNECT_DELAYS = (1, 2, 5, 10, 30)
+
+
 async def _listen_for_invalidations() -> None:
-    """Loop de escuta — roda até cancelamento."""
+    """Loop de escuta com reconexão automática em caso de falha de rede."""
     if _client is None:
         raise RuntimeError("Redis não conectado")
 
-    pubsub = _client.pubsub()
-    await pubsub.subscribe(settings.redis_pubsub_channel)
+    attempt = 0
+    while True:
+        pubsub = _client.pubsub()
+        try:
+            await pubsub.subscribe(settings.redis_pubsub_channel)
+            log.info("[pub/sub] subscrito ao canal: %s", settings.redis_pubsub_channel)
+            attempt = 0  # reconectou com sucesso — reseta o contador
 
-    try:
-        async for message in pubsub.listen():
-            if message["type"] != "message":
-                continue
+            async for message in pubsub.listen():
+                if message["type"] != "message":
+                    continue
+                try:
+                    data = json.loads(message["data"])
+                    for handler in _invalidation_handlers:
+                        if asyncio.iscoroutinefunction(handler):
+                            asyncio.create_task(handler(data))
+                        else:
+                            handler(data)
+                except (json.JSONDecodeError, Exception) as exc:
+                    log.warning("[pub/sub] erro ao processar mensagem: %s", exc)
+
+        except asyncio.CancelledError:
+            # Cancelamento intencional (shutdown) — encerra sem retry
+            log.info("[pub/sub] listener cancelado")
+            return
+        except Exception as exc:
+            log.error("[pub/sub] conexão perdida: %s", exc)
+        finally:
             try:
-                data = json.loads(message["data"])
-                for handler in _invalidation_handlers:
-                    # Suporta handlers sync e async
-                    if asyncio.iscoroutinefunction(handler):
-                        asyncio.create_task(handler(data))
-                    else:
-                        handler(data)
-            except (json.JSONDecodeError, Exception) as exc:
-                log.warning("Erro ao processar mensagem pub/sub: %s", exc)
-    except asyncio.CancelledError:
-        pass
-    finally:
-        await pubsub.unsubscribe(settings.redis_pubsub_channel)
-        await pubsub.aclose()
+                await pubsub.unsubscribe(settings.redis_pubsub_channel)
+                await pubsub.aclose()
+            except Exception:
+                pass
+
+        delay = _RECONNECT_DELAYS[min(attempt, len(_RECONNECT_DELAYS) - 1)]
+        log.info("[pub/sub] reconectando em %ds (tentativa %d)...", delay, attempt + 1)
+        await asyncio.sleep(delay)
+        attempt += 1
