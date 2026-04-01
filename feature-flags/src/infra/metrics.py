@@ -68,6 +68,12 @@ webhook_dispatch_total = Counter(
     labelnames=["result"],
 )
 
+webhook_dispatch_duration_seconds = Histogram(
+    "webhook_dispatch_duration_seconds",
+    "Latência do disparo de webhooks externos (segundos)",
+    buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0),
+)
+
 # ── DB pool ───────────────────────────────────────────────────────────────────
 
 db_pool_size = Gauge(

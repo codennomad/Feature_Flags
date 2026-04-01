@@ -148,10 +148,12 @@ def create_app() -> FastAPI:
     from src.api.v1.flags import router as flags_router
     from src.api.v1.evaluation import router as evaluation_router
     from src.api.v1.webhooks import router as webhooks_router
+    from src.api.v1.environments import router as environments_router
 
     app.include_router(flags_router, prefix="/api/v1")
     app.include_router(evaluation_router, prefix="/api/v1")
     app.include_router(webhooks_router, prefix="/api/v1")
+    app.include_router(environments_router, prefix="/api/v1")
 
     # ── Health ────────────────────────────────────────────────────────────────
     @app.get("/health", tags=["health"])
