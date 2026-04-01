@@ -1,5 +1,14 @@
 # Feature Flags API
 
+[![Python](https://img.shields.io/badge/python-3.12-blue?logo=python&logoColor=white)](https://www.python.org/downloads/release/python-3120/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Tests](https://img.shields.io/badge/tests-67%20passed-brightgreen?logo=pytest&logoColor=white)](./tests)
+[![Coverage](https://img.shields.io/badge/coverage-85%25%2B-brightgreen)](./coverage.xml)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)](./Dockerfile)
+[![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+
 Production-grade feature flag platform built in Python. Sub-millisecond flag evaluation via in-process cache, zero I/O on the hot path.
 
 ```
