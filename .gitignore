@@ -116,3 +116,8 @@ profile_output/
 *.orig
 .cache/
 tmp/
+
+# ─── Markdown na raiz (planejamento / notas temporárias) ──────────────────────
+# Manter apenas README.md — o resto são artefatos GSD ou notas de trabalho
+/*.md
+!/README.md
