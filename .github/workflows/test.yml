@@ -1,0 +1,143 @@
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["main", "develop"]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  unit-and-integration:
+    name: Unit + Integration
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: feature-flags
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Unit + Integration (with coverage)
+        run: |
+          pytest tests/unit tests/integration \
+            -v --tb=short \
+            --cov=src --cov-report=term-missing \
+            --cov-fail-under=85
+
+  consistency:
+    name: Consistency (concurrency)
+    runs-on: ubuntu-latest
+    needs: unit-and-integration
+    defaults:
+      run:
+        working-directory: feature-flags
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Consistency tests
+        run: pytest tests/consistency -v --timeout=60 -m consistency
+
+  security-scan:
+    name: Security static analysis
+    runs-on: ubuntu-latest
+    needs: unit-and-integration
+    defaults:
+      run:
+        working-directory: feature-flags
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install tools
+        run: pip install bandit safety semgrep pip-audit
+
+      - name: Bandit — análise de código
+        run: bandit -r src/ -ll -ii --skip B101
+
+      - name: Safety — CVEs em dependências
+        run: safety check --full-report
+        continue-on-error: true  # não disponível sem chave API em forks públicos
+
+      - name: Semgrep — padrões inseguros
+        run: semgrep --config=p/python --config=p/fastapi --config=p/jwt --error --quiet src/
+        continue-on-error: true
+
+      - name: pip-audit — vulnerabilidades
+        run: pip-audit
+        continue-on-error: true
+
+  security-tests:
+    name: Security tests
+    runs-on: ubuntu-latest
+    needs: security-scan
+    defaults:
+      run:
+        working-directory: feature-flags
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Security tests
+        run: pytest tests/security -v -m security --timeout=120 --tb=short
+
+  performance:
+    name: Performance regression
+    runs-on: ubuntu-latest
+    needs: unit-and-integration
+    defaults:
+      run:
+        working-directory: feature-flags
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Performance — p99 < 1ms
+        run: pytest tests/performance/test_evaluation_latency.py -v -m performance
+        # Falha se p99 > 1ms — regressão de performance vira falha de CI
