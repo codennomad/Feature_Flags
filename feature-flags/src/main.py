@@ -26,6 +26,7 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -51,6 +52,57 @@ from src.infra.metrics import db_pool_size, db_pool_checked_out
 from src.models.flag import Flag
 
 log = logging.getLogger(__name__)
+
+# ── Logging estruturado (structlog) ──────────────────────────────────────────────
+def _configure_logging() -> None:
+    """Configura structlog para emitir JSON em produção e texto bonito em dev."""
+    shared_processors = [
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+    ]
+
+    if settings.debug:
+        renderer = structlog.dev.ConsoleRenderer()
+    else:
+        renderer = structlog.processors.JSONRenderer()
+
+    structlog.configure(
+        processors=shared_processors + [renderer],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG if settings.debug else logging.INFO),
+        context_class=dict,
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+    # Redireciona o stdlib logging padrão (uvicorn, sqlalchemy, etc.) para structlog
+    logging.basicConfig(
+        format="%(message)s",
+        level=logging.DEBUG if settings.debug else logging.INFO,
+    )
+
+
+# ── Sentry (error tracking + tracing) ────────────────────────────────────────
+def _configure_sentry() -> None:
+    """Inicializa o Sentry se SENTRY_DSN estiver configurado."""
+    if not settings.sentry_dsn:
+        return
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        environment=settings.environment,
+        release=settings.app_version,
+        integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+        # Nunca envia dados pessoais / tokens
+        send_default_pii=False,
+    )
+    log.info("Sentry inicializado (environment=%s)", settings.environment)
+
 
 # ── Limiter global (slowapi) ──────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address)
@@ -119,6 +171,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Factory function — cria e configura a aplicação FastAPI."""
+    _configure_logging()
+    _configure_sentry()
+
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,

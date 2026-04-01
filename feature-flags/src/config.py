@@ -71,6 +71,18 @@ class Settings(BaseSettings):
     db_pool_size: int = Field(default=20)
     db_max_overflow: int = Field(default=10)
 
+    # ── Sentry ───────────────────────────────────────────────────────────────
+    # Defina SENTRY_DSN para ativar error tracking e tracing.
+    # Deixe vazio para desativar (ex: em desenvolvimento).
+    sentry_dsn: str = Field(
+        default="",
+        description="DSN do Sentry para error tracking/tracing (SENTRY_DSN).",
+    )
+    sentry_traces_sample_rate: float = Field(
+        default=0.1,
+        description="Fração de transações amostradas pelo Sentry (0.0–1.0).",
+    )
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @model_validator(mode="after")
