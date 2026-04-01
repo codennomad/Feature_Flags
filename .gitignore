@@ -1,0 +1,118 @@
+# ─── Segredos e variáveis de ambiente ─────────────────────────────────────────
+# NUNCA commitar segredos. Use .env.example como template.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+secrets/
+.secrets/
+
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+MANIFEST
+
+# ─── Ambientes virtuais ────────────────────────────────────────────────────────
+.venv/
+venv/
+ENV/
+env/
+.Python
+pyvenv.cfg
+
+# ─── Pytest / Coverage ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+nosetests.xml
+test-results/
+junit*.xml
+
+# ─── Mypy / Ruff / Pyright ────────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+pyrightconfig.json
+
+# ─── Build / Packaging ────────────────────────────────────────────────────────
+*.whl
+*.tar.gz
+*.zip
+site/
+
+# ─── Docker ───────────────────────────────────────────────────────────────────
+# Não ignorar docker-compose.yml — é artefato de desenvolvimento obrigatório
+.docker/
+
+# ─── Banco de dados local ─────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+pgdata/
+dump.sql
+*.dump
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+*.log.*
+
+# ─── IDEs e editores ──────────────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── Node (GSD / ferramentas de dev) ─────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ─── Alembic ──────────────────────────────────────────────────────────────────
+# Manter migrations/ mas ignorar artefatos temporários
+migrations/versions/__pycache__/
+
+# ─── Prometheus data ──────────────────────────────────────────────────────────
+prometheus_data/
+
+# ─── Profiling ────────────────────────────────────────────────────────────────
+*.prof
+*.lprof
+profile_output/
+
+# ─── Arquivos temporários ─────────────────────────────────────────────────────
+*.tmp
+*.temp
+*.bak
+*.orig
+.cache/
+tmp/
