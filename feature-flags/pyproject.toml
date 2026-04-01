@@ -77,8 +77,6 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=xml",
     "--cov-fail-under=85",
-    "--ignore=tests/security",
-    "--ignore=tests/performance",
 ]
 
 [tool.ruff]
