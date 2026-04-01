@@ -236,7 +236,7 @@ async def async_client(
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
-        base_url="http://testserver",
+        base_url="http://localhost",
     ) as client:
         yield client
 

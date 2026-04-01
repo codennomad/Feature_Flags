@@ -158,8 +158,10 @@ def create_app() -> FastAPI:
     )
 
     # ── Trusted Host ─────────────────────────────────────────────────────────
+    # allowed_hosts vem de ALLOWED_HOSTS (env var, vírgula-separado).
+    # Default: localhost/127.0.0.1 para dev. Em produção defina explicitamente.
     if not settings.debug:
-        app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 
     # ── Prometheus ────────────────────────────────────────────────────────────
     Instrumentator(

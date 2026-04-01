@@ -4,8 +4,10 @@ Todas as variáveis de ambiente são lidas aqui — NUNCA espalhadas pelo códig
 """
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
+
+_INSECURE_SECRET_PLACEHOLDER = "CHANGE_ME_IN_PRODUCTION_THIS_IS_NOT_SECURE"
 
 
 class Settings(BaseSettings):
@@ -26,9 +28,11 @@ class Settings(BaseSettings):
     )
 
     # ── JWT ───────────────────────────────────────────────────────────────────
+    # Lido da env var SECRET_KEY. A aplicação recusa inicializar em
+    # ENVIRONMENT=production com o valor placeholder.
     secret_key: str = Field(
-        default="CHANGE_ME_IN_PRODUCTION_THIS_IS_NOT_SECURE",
-        description="Chave secreta para assinar JWTs (HS256)",
+        default=_INSECURE_SECRET_PLACEHOLDER,
+        description="Chave secreta para assinar JWTs (HS256). Defina SECRET_KEY.",
     )
     jwt_algorithm: str = Field(
         default="HS256",
@@ -46,13 +50,36 @@ class Settings(BaseSettings):
     app_name: str = Field(default="Feature Flags API")
     app_version: str = Field(default="1.0.0")
     debug: bool = Field(default=False)
-    environment: str = Field(default="production")
+    # Padrão "development": em produção definir explicitamente ENVIRONMENT=production.
+    environment: str = Field(default="development")
+
+    # ── CORS / Trusted Hosts ──────────────────────────────────────────────────
+    # Defina ALLOWED_HOSTS como lista separada por vírgula, ex:
+    # ALLOWED_HOSTS=api.meudominio.com,api-interno.meudominio.com
+    allowed_hosts: list[str] = Field(
+        default=["localhost", "127.0.0.1"],
+        description="Hosts permitidos pelo TrustedHostMiddleware (ALLOWED_HOSTS).",
+    )
 
     # ── SQLAlchemy pool ───────────────────────────────────────────────────────
     db_pool_size: int = Field(default=20)
     db_max_overflow: int = Field(default=10)
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @model_validator(mode="after")
+    def _reject_insecure_secret_in_production(self) -> "Settings":
+        """Impede a aplicação de subir em produção com a chave JWT placeholder."""
+        if (
+            self.environment == "production"
+            and self.secret_key == _INSECURE_SECRET_PLACEHOLDER
+        ):
+            raise ValueError(
+                "SECRET_KEY não pode ser o valor placeholder em ENVIRONMENT=production. "
+                "Defina a variável de ambiente SECRET_KEY com um segredo seguro "
+                "(mínimo de 32 bytes de entropia, ex: openssl rand -hex 32)."
+            )
+        return self
 
 
 settings = Settings()
