@@ -48,7 +48,7 @@ class EvaluationResult(BaseModel):
 
 
 class BatchEvaluationRequest(BaseModel):
-    flags: list[str] = Field(..., min_length=1, max_length=100)
+    flags: list[str] = Field(..., min_length=1, max_length=50)
     user_id: str = Field(..., min_length=1, max_length=512)
     environment: str = Field(..., min_length=1, max_length=100)
     attributes: dict[str, Any] = Field(default_factory=dict)
@@ -56,9 +56,17 @@ class BatchEvaluationRequest(BaseModel):
     @field_validator("flags")
     @classmethod
     def validate_flags(cls, v: list[str]) -> list[str]:
-        if len(v) > 100:
-            raise ValueError("Máximo de 100 flags por batch")
+        if len(v) > 50:
+            raise ValueError("Máximo de 50 flags por batch")
         return v
+
+    @property
+    def context(self) -> "EvaluationContext":
+        return EvaluationContext(
+            user_id=self.user_id,
+            environment=self.environment,
+            attributes=self.attributes,
+        )
 
 
 class SingleEvaluationRequest(BaseModel):
@@ -66,3 +74,15 @@ class SingleEvaluationRequest(BaseModel):
     user_id: str = Field(..., min_length=1, max_length=512)
     environment: str = Field(..., min_length=1, max_length=100)
     attributes: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def context(self) -> "EvaluationContext":
+        return EvaluationContext(
+            user_id=self.user_id,
+            environment=self.environment,
+            attributes=self.attributes,
+        )
+
+
+class BatchEvaluationResponse(BaseModel):
+    results: list[EvaluationResult]

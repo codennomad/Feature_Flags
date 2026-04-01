@@ -161,3 +161,13 @@ class WebhookCreate(BaseModel):
         if not v.startswith(("https://", "http://")):
             raise ValueError("URL do webhook deve começar com http:// ou https://")
         return v
+
+
+class WebhookResponse(BaseModel):
+    id: uuid.UUID
+    url: str
+    events: list[str]
+    active: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
