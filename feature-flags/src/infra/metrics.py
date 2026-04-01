@@ -40,6 +40,12 @@ cache_size_flags = Gauge(
     "Número de flags armazenadas no cache local",
 )
 
+cache_refresh_duration_seconds = Histogram(
+    "cache_refresh_duration_seconds",
+    "Duração do warm-up do cache de flags em segundos",
+    buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0),
+)
+
 # ── Pub/Sub ───────────────────────────────────────────────────────────────────
 
 pubsub_invalidations_total = Counter(

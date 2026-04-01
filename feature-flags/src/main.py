@@ -50,13 +50,13 @@ log = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 
 
-async def _load_all_flags() -> dict:
-    """Carrega todas as flags do banco e retorna um dict keyed by flag.key."""
+async def _load_all_flags() -> list[dict]:
+    """Carrega todas as flags do banco e retorna lista de dicts (formato do cache)."""
     async with database.AsyncSessionLocal() as session:
         result = await session.execute(select(Flag))
         flags = result.scalars().all()
-        return {
-            f.key: {
+        return [
+            {
                 "id": str(f.id),
                 "key": f.key,
                 "name": f.name,
@@ -66,7 +66,7 @@ async def _load_all_flags() -> dict:
                 "version": f.version,
             }
             for f in flags
-        }
+        ]
 
 
 @asynccontextmanager
