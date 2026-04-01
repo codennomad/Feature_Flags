@@ -1,12 +1,8 @@
-"""
-conftest.py — fixtures compartilhadas para toda a suite de testes.
-
-Usa SQLite in-memory para testes de integração sem Docker.
-O lifespan da app é substituído por um no-op para evitar conexões reais.
-"""
 from __future__ import annotations
 
 import asyncio
+import json
+import sys
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -19,12 +15,48 @@ from httpx import ASGITransport, AsyncClient
 from jose import jwt
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from src.api.deps import get_session
 from src.config import settings
 from src.core.cache import FlagCache
 from src.core.evaluation import EvaluationEngine
 from src.infra.database import Base
 from src.main import create_app
 from tests.factories import FlagFactory
+
+# ── Compatibilidade SQLite: JSONB → JSON ──────────────────────────────────────
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler  # noqa: E402
+
+if not hasattr(SQLiteTypeCompiler, "visit_JSONB"):
+    SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
+
+# ── Compatibilidade SQLite: UUID como string → uuid.UUID ─────────────────────
+# postgresql.UUID.bind_processor chama .hex no valor, que falha para strings.
+# No SQLite em testes, convertemos strings para uuid.UUID antes de processar.
+from sqlalchemy.dialects.postgresql import UUID as _PG_UUID  # noqa: E402
+
+_orig_bind_processor = _PG_UUID.bind_processor
+
+
+def _safe_bind_processor(self, dialect):
+    processor = _orig_bind_processor(self, dialect)
+    if processor is None:
+        return None
+
+    def _safe_process(value):
+        if value is not None and not isinstance(value, uuid.UUID):
+            try:
+                value = uuid.UUID(str(value))
+            except (ValueError, AttributeError):
+                pass
+        return processor(value)
+
+    return _safe_process
+
+
+_PG_UUID.bind_processor = _safe_bind_processor
+
+# Permite JSON profundamente aninhado nos testes de input validation
+sys.setrecursionlimit(3000)
 
 
 # ── Lifespan no-op para testes (evita conexões externas) ─────────────────────
@@ -92,9 +124,15 @@ def auth_headers(admin_token: str) -> dict:
 @pytest_asyncio.fixture(scope="function")
 async def db_engine():
     """Engine SQLite in-memory para testes de integração sem Docker."""
+
+    def _json_serializer(obj):
+        """JSON serializer que converte UUID e datetime para str."""
+        return json.dumps(obj, default=str)
+
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         echo=False,
+        json_serializer=_json_serializer,
     )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -166,19 +204,40 @@ def engine(loaded_cache: FlagCache) -> EvaluationEngine:
 
 
 @pytest_asyncio.fixture
-async def async_client(loaded_cache: FlagCache) -> AsyncGenerator[AsyncClient, None]:
+async def async_client(
+    loaded_cache: FlagCache, db_engine
+) -> AsyncGenerator[AsyncClient, None]:
     """
     Cliente HTTP assíncrono que usa a app FastAPI sem servidor real.
-    Injeta cache pré-carregado no estado da app e usa lifespan no-op.
+    - lifespan substituído por no-op (sem conexões externas reais)
+    - SessionDep sobrescrita para usar SQLite in-memory
+    - Cache e engine injetados no estado da app
     """
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    test_session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
+
+    async def _override_get_session():
+        async with test_session_factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
     app = create_app()
     # Substitui o lifespan real pelo no-op para evitar conexões a DB/Redis
     app.router.lifespan_context = _noop_lifespan
     app.state.cache = loaded_cache
     app.state.engine = EvaluationEngine(cache=loaded_cache)
+    # Sobrescreve a sessão de banco para usar SQLite in-memory
+    app.dependency_overrides[get_session] = _override_get_session
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://testserver",
     ) as client:
         yield client
+
+    app.dependency_overrides.clear()

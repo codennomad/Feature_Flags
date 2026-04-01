@@ -29,7 +29,7 @@ limiter = Limiter(key_func=get_remote_address)
     response_model=EvaluationResult,
     summary="Avaliar uma feature flag",
 )
-@limiter.limit("1000/minute")
+@limiter.limit("100/minute")
 async def evaluate_single(
     request: Request,
     body: SingleEvaluationRequest,

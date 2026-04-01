@@ -10,11 +10,11 @@ import pytest
 pytestmark = pytest.mark.security
 
 
-OVERSIZED_PAYLOADS = {
-    "key": "a" * 10_000,
-    "name": "x" * 100_000,
-    "description": "y" * 1_000_000,
-}
+OVERSIZED_PAYLOADS = [
+    pytest.param("key", "a" * 10_000, id="key-10k"),
+    pytest.param("name", "x" * 100_000, id="name-100k"),
+    pytest.param("description", "y" * 1_000_000, id="description-1M"),
+]
 
 SPECIAL_CHARS = [
     "<script>alert(1)</script>",
@@ -30,7 +30,7 @@ SPECIAL_CHARS = [
 
 class TestInputValidation:
 
-    @pytest.mark.parametrize("field,value", list(OVERSIZED_PAYLOADS.items()))
+    @pytest.mark.parametrize("field,value", OVERSIZED_PAYLOADS)
     async def test_oversized_fields_rejected(self, async_client, admin_token, field, value):
         """Campos com tamanho excessivo devem ser rejeitados com 422."""
         headers = {"Authorization": f"Bearer {admin_token}"}

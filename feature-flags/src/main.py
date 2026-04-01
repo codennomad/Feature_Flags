@@ -26,9 +26,15 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
+
+try:
+    from pydantic_core import PydanticSerializationError as _PydanticSerializationError
+except ImportError:  # pragma: no cover
+    _PydanticSerializationError = None  # type: ignore[assignment, misc]
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -124,6 +130,23 @@ def create_app() -> FastAPI:
     # ── Slowapi (rate limiting) ───────────────────────────────────────────────
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    # JSON com profundidade excessiva causa RecursionError no parsing/validação
+    app.add_exception_handler(
+        RecursionError,
+        lambda request, exc: JSONResponse(
+            status_code=422,
+            content={"detail": "Payload excede profundidade máxima suportada."},
+        ),
+    )
+    # Pydantic v2 lança PydanticSerializationError ao serializar objetos demasiado aninhados
+    if _PydanticSerializationError is not None:
+        app.add_exception_handler(
+            _PydanticSerializationError,
+            lambda request, exc: JSONResponse(
+                status_code=422,
+                content={"detail": "Payload excede profundidade máxima suportada."},
+            ),
+        )
     app.add_middleware(SlowAPIMiddleware)
 
     # ── CORS ─────────────────────────────────────────────────────────────────
